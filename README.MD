@@ -1,7 +1,7 @@
 # TSUKURI
 
 <p align="center">
-  <img src="static/webicon.ico" alt="Tsukuri Icon" width="160" />
+  <img src="static/logo.png" alt="Tsukuri Icon" width="360" />
 </p>
 
 <p align="center">
