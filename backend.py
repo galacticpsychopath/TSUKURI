@@ -16,22 +16,29 @@ admin_password = os.environ.get('ADMIN_PASSWORD')
 def home():
     return render_template('login.html') 
 @app.route('/login', methods=['POST'])
-def login(): 
-    data = request.get_json()
-    username=data.get('username')
-    password=data.get('password')
+def login():
+    
+    data = request.get_json(silent=True)
+    
+   
+    if not data:
+        username = request.form.get('username')
+        password = request.form.get('password')
+    else:
+        username = data.get('username')
+        password = data.get('password')
+
     if username == admin_username and password == admin_password:
         return jsonify({'success': True, 'message': 'Login successful'}), 200
     else:
         return jsonify({'success': False, 'message': 'Invalid credentials'}), 401
-    
 @app.route('/progress')
 def progress():
     return render_template('progress.html')
 
-@app.route('/diary')
+@app.route('/Diary')
 def diary():
-    return render_template('diary.html')
+    return render_template('Diary.html')
 
 
 
