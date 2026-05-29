@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tsukuri</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='webicon.ico') }}">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #000; --s1: #0f0f0f; --s2: #181818; --s3: #222;
+            --border: rgba(255,255,255,.08); --white: #fff; --black: #000;
+            --text: #f0f0f0; --muted: #555; --muted2: #333;
+        }
+        body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
+
+        .app-header { height: 70px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; }
+        .logo-box { font-size: 1.2rem; font-weight: 800; color: var(--white); }
+        
+        .main-container { display: grid; grid-template-columns: 360px 1fr; height: calc(100vh - 70px); }
+        
+        .tracker-panel { padding: 2rem; border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; }
+        
+        .year-panel { padding: 2rem; display: flex; flex-direction: column; overflow: hidden; }
+        .month-grid { display: flex; flex-direction: column; flex-grow: 1; justify-content: space-between; }
+        
+        .panel-title { font-size: 1.4rem; color: var(--white); margin-bottom: 1.2rem; }
+        .btn-link { padding: .48rem .95rem; background: var(--white); color: var(--black); border-radius: 7px; font-size: .8rem; font-weight: 600; text-decoration: none; border: none; cursor: pointer; }
+        
+        .date-chip { font-family: monospace; font-size: .68rem; color: var(--muted); background: var(--s2); padding: .22rem .6rem; border-radius: 4px; margin-bottom: 1.2rem; display: inline-block; width: fit-content; }
+        .prog-track { height: 6px; background: var(--s3); margin-bottom: 1.5rem; border-radius: 3px; overflow: hidden; }
+        .prog-fill { height: 100%; background: var(--white); width: 0%; transition: width 0.3s ease; }
+        
+        .habit-row { display: flex; align-items: center; gap: .7rem; padding: .7rem .9rem; background: var(--s1); border: 1px solid var(--border); border-radius: 8px; margin-bottom: .45rem; cursor: pointer; }
+        .habit-row.done { background: var(--s2); }
+        .hcheck { width: 17px; height: 17px; border: 1.5px solid var(--muted2); border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: .6rem; }
+        .habit-row.done .hcheck { background: var(--white); color: var(--black); }
+        .del-btn { opacity: 0; background: none; border: none; color: var(--muted); cursor: pointer; margin-left: auto; }
+        .habit-row:hover .del-btn { opacity: 1; }
+        
+        .add-row { display: flex; gap: .45rem; margin-top: auto; padding-top: 1rem; }
+        input { background: var(--s1); border: 1px solid var(--border); color: var(--text); padding: .48rem; border-radius: 7px; }
+        
+        .month-row { display: flex; align-items: center; gap: 15px; }
+        .mname { font-size: 0.7rem; color: var(--muted); width: 25px; flex-shrink: 0; }
+        .days-row { display: flex; gap: 5px; flex-wrap: wrap; }
+        
+        /* Desktop size */
+        .dcell { width: 16px; height: 16px; border-radius: 2px; background: var(--s2); }
+        .dcell.l1 { background: #333; } .dcell.l2 { background: #666; } .dcell.l3 { background: #999; } .dcell.l4 { background: var(--white); }
+        
+        .year-select-row { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; }
+        .yr-arrow { background: var(--s2); border: 1px solid var(--border); color: var(--text); padding: 5px 12px; cursor: pointer; border-radius: 4px; }
+        .legend-row { display: flex; gap: 8px; align-items: center; font-size: 0.7rem; color: var(--muted); margin-top: 1rem; }
+
+        /* Mobile Responsive adjustments */
+        @media (max-width: 768px) {
+            .main-container { grid-template-columns: 1fr; overflow-y: auto; height: auto; }
+            .dcell { width: 10px; height: 10px; } /* Shrink on phone */
+            .days-row { gap: 3px; }
+            .month-row { gap: 8px; }
+        }
+    </style>
+</head>
+<body>
+    <header class="app-header">
+        <div class="logo-box">TSUKURI</div>
+        <a href="/diary" class="btn-link">Diary</a>
+    </header>
+
+    <div class="main-container">
+        <div class="tracker-panel">
+            <div class="panel-title">Today</div>
+            <div class="date-chip" id="dateChip"></div>
+            <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+            <div id="habitsList"></div>
+            <div class="add-row">
+                <input id="emojiIn" type="text" maxlength="2" placeholder="★" style="width: 40px;">
+                <input id="nameIn" type="text" placeholder="New habit...">
+                <button class="btn-link" onclick="addHabit()">Add</button>
+            </div>
+        </div>
+        
+        <div class="year-panel">
+            <div class="month-grid" id="monthGrid"></div>
+            <div class="year-select-row">
+                <button class="yr-arrow" onclick="changeYear(-1)">←</button>
+                <div id="yearNum" style="font-weight: bold;"></div>
+                <button class="yr-arrow" onclick="changeYear(1)">→</button>
+            </div>
+            <div class="legend-row">
+                <span>Less</span>
+                <div style="display:flex; gap:3px;">
+                    <div class="dcell"></div><div class="dcell l1"></div><div class="dcell l2"></div><div class="dcell l3"></div><div class="dcell l4"></div>
+                </div>
+                <span>More</span>
+            </div>
+        </div>
+    </div>
+    <script>
+        // ... (Script remains same as your previous code)
+        let hbs = JSON.parse(localStorage.getItem('ts_h') || '[]');
+        let log = JSON.parse(localStorage.getItem('ts_l') || '{}');
+        let viewYear = new Date().getFullYear();
+        const save = () => { localStorage.setItem('ts_h', JSON.stringify(hbs)); localStorage.setItem('ts_l', JSON.stringify(log)); };
+        const todayStr = () => new Date().toISOString().split('T')[0];
+        const toggle = (id) => { const d = todayStr(); if (!log[d]) log[d] = {}; log[d][id] = !log[d][id]; save(); render(); };
+        const addHabit = () => { const nameIn = document.getElementById('nameIn'); const emojiIn = document.getElementById('emojiIn'); if (!nameIn.value) return; hbs.push({ id: 'h'+Date.now(), e: emojiIn.value || '★', n: nameIn.value }); nameIn.value = ''; save(); render(); };
+        const delHabit = (id) => { hbs = hbs.filter(h => h.id !== id); save(); render(); };
+        const changeYear = (dir) => { viewYear += dir; render(); };
+        function render() {
+            document.getElementById('dateChip').textContent = new Date().toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' });
+            const d = todayStr();
+            const list = document.getElementById('habitsList');
+            list.innerHTML = '';
+            hbs.forEach(h => { const done = !!log[d]?.[h.id]; list.insertAdjacentHTML('beforeend', `<div class="habit-row ${done ? 'done' : ''}" onclick="toggle('${h.id}')"><div class="hcheck">${done ? '✓' : ''}</div><span>${h.e} ${h.n}</span><button class="del-btn" onclick="event.stopPropagation(); delHabit('${h.id}')">✕</button></div>`); });
+            const todayLogs = log[d] || {};
+            const completedCount = hbs.filter(h => todayLogs[h.id] === true).length;
+            document.getElementById('progFill').style.width = (hbs.length > 0 ? (completedCount / hbs.length) * 100 : 0) + '%';
+            renderYear();
+        }
+        function renderYear() {
+            document.getElementById('yearNum').textContent = viewYear;
+            const grid = document.getElementById('monthGrid'); grid.innerHTML = '';
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            months.forEach((m, mi) => {
+                const row = document.createElement('div'); row.className = 'month-row';
+                row.innerHTML = `<div class="mname">${m}</div><div class="days-row" id="m${mi}"></div>`;
+                grid.appendChild(row);
+                const drow = document.getElementById('m'+mi);
+                const daysInMonth = new Date(viewYear, mi + 1, 0).getDate();
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const ds = `${viewYear}-${String(mi+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                    const dayData = log[ds] || {};
+                    const completedInDay = hbs.filter(h => dayData[h.id] === true).length;
+                    let level = 0;
+                    if (hbs.length > 0) {
+                        const pct = completedInDay / hbs.length;
+                        if (pct === 1) level = 4; else if (pct >= 0.75) level = 3; else if (pct >= 0.5) level = 2; else if (pct > 0) level = 1;
+                    }
+                    drow.insertAdjacentHTML('beforeend', `<div class="dcell l${level}" title="${ds}"></div>`);
+                }
+            });
+        }
+        render();
+    </script>
+</body>
+</html>

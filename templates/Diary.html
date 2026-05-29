@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Tsukuri - Diary</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='webicon.ico') }}">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #000; --s1: #0f0f0f; --s2: #181818; --s3: #222;
+            --border: rgba(255,255,255,.08); --white: #fff; --black: #000;
+            --text: #f0f0f0; --muted: #555; --muted2: #333;
+        }
+        body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
+
+        /* Header */
+        .app-header { height: 70px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; }
+        .logo-box { font-size: 1.2rem; font-weight: 800; color: var(--white); cursor: pointer; }
+
+        /* Diary Layout */
+        #page-diary { display: grid; grid-template-columns: 360px 1fr; height: calc(100vh - 70px); }
+        .diary-sidebar { padding: 2rem; border-right: 1px solid var(--border); overflow-y: auto; }
+        .sidebar-title { font-size: 1.4rem; color: var(--white); margin-bottom: 1.2rem; }
+        
+        .diary-editor { padding: 2rem; display: flex; flex-direction: column; gap: 1rem; }
+        .diary-title-input { background: var(--s1); border: 1px solid var(--border); color: var(--white); padding: 1rem; border-radius: 8px; font-size: 1.2rem; outline: none; }
+        
+        .mood-strip { display: flex; gap: 10px; }
+        .mood-btn { background: var(--s2); border: 1px solid var(--border); padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+        .mood-btn:hover { border-color: var(--white); }
+        
+        .diary-body { background: var(--s1); border: 1px solid var(--border); color: var(--text); padding: 1rem; border-radius: 8px; flex-grow: 1; resize: none; outline: none; line-height: 1.6; }
+        
+        .editor-btns { display: flex; gap: 10px; justify-content: flex-end; }
+        .btn-new, .btn-save, .btn-del { padding: .5rem 1.2rem; border-radius: 7px; font-size: .8rem; font-weight: 600; cursor: pointer; border: none; }
+        .btn-new { background: var(--s2); color: var(--text); margin-bottom: 1rem; width: 100%; }
+        .btn-save { background: var(--white); color: var(--black); }
+        .btn-del { background: var(--s3); color: #ff6b6b; }
+
+        /* MOBILE RESPONSIVE ADAPTATIONS */
+        @media (max-width: 768px) {
+            #page-diary { grid-template-columns: 1fr; overflow-y: auto; height: auto; }
+            .diary-sidebar { border-right: none; border-bottom: 1px solid var(--border); max-height: 300px; padding: 1.5rem; }
+            .diary-editor { padding: 1.5rem; gap: 1rem; }
+            
+            /* Increased sizes for better clarity */
+            .diary-title-input { padding: 1rem; font-size: 1.1rem; }
+            .diary-body { font-size: 1.05rem; padding: 1rem; }
+            .mood-btn { padding: 0.6rem 0.9rem; font-size: 1.1rem; }
+            .btn-new, .btn-save, .btn-del { padding: 0.8rem 1.5rem; font-size: 0.95rem; }
+        }
+    </style>
+</head>
+<body>
+
+<header class="app-header">
+    <div class="logo-box" onclick="window.location.href='/'">TSUKURI</div>
+    <a href="/" style="color: var(--muted); text-decoration: none; font-size: 0.8rem;">Back to Tracker</a>
+</header>
+
+<div id="page-diary" class="page">
+    <div class="diary-sidebar">
+        <div class="sidebar-title">Journal</div>
+        <button class="btn-new" onclick="newEntry()">+ New entry</button>
+        <div id="entryList"></div>
+    </div>
+    <div class="diary-editor">
+        <input class="diary-title-input" id="dTitle" type="text" placeholder="Entry title...">
+        <div class="mood-strip" id="moodStrip">
+            <button class="mood-btn" data-m="😊" onclick="pickMood(this)">😊</button>
+            <button class="mood-btn" data-m="😐" onclick="pickMood(this)">😐</button>
+            <button class="mood-btn" data-m="😔" onclick="pickMood(this)">😔</button>
+            <button class="mood-btn" data-m="🔥" onclick="pickMood(this)">🔥</button>
+            <button class="mood-btn" data-m="😴" onclick="pickMood(this)">😴</button>
+            <button class="mood-btn" data-m="😤" onclick="pickMood(this)">😤</button>
+        </div>
+        <textarea class="diary-body" id="dBody" placeholder="Write freely... This space is yours."></textarea>
+        <div class="editor-btns">
+            <button class="btn-del" onclick="deleteEntry()">Delete</button>
+            <button class="btn-save" onclick="saveEntry()">Save</button>
+        </div>
+    </div>
+</div>
+<script>
+    let entries = JSON.parse(localStorage.getItem('ts_diary') || '[]');
+    let currentId = null;
+    let selectedMood = null;
+
+    const saveToDisk = () => localStorage.setItem('ts_diary', JSON.stringify(entries));
+
+    const renderList = () => {
+        const list = document.getElementById('entryList');
+        list.innerHTML = '';
+        entries.sort((a, b) => b.id - a.id).forEach(e => {
+            const div = document.createElement('div');
+            div.style.padding = '12px 10px'; div.style.borderBottom = '1px solid var(--border)';
+            div.style.cursor = 'pointer'; div.style.fontSize = '1rem';
+            div.innerHTML = `<strong>${e.title || 'Untitled'}</strong><br><small style="color:var(--muted)">${new Date(e.id).toLocaleDateString()}</small>`;
+            div.onclick = () => loadEntry(e.id);
+            list.appendChild(div);
+        });
+    };
+
+    const pickMood = (btn) => {
+        document.querySelectorAll('.mood-btn').forEach(b => b.style.borderColor = 'var(--border)');
+        btn.style.borderColor = 'var(--white)';
+        selectedMood = btn.getAttribute('data-m');
+    };
+
+    const newEntry = () => {
+        currentId = null; selectedMood = null;
+        document.getElementById('dTitle').value = '';
+        document.getElementById('dBody').value = '';
+        document.querySelectorAll('.mood-btn').forEach(b => b.style.borderColor = 'var(--border)');
+    };
+
+    const saveEntry = () => {
+        const title = document.getElementById('dTitle').value;
+        const body = document.getElementById('dBody').value;
+        if (!title && !body) return;
+
+        if (currentId) {
+            const index = entries.findIndex(e => e.id === currentId);
+            entries[index] = { id: currentId, title, body, mood: selectedMood };
+        } else {
+            currentId = Date.now();
+            entries.push({ id: currentId, title, body, mood: selectedMood });
+        }
+        saveToDisk(); renderList();
+    };
+
+    const deleteEntry = () => {
+        if (!currentId) return;
+        entries = entries.filter(e => e.id !== currentId);
+        saveToDisk(); renderList(); newEntry();
+    };
+
+    const loadEntry = (id) => {
+        const entry = entries.find(e => e.id === id);
+        currentId = entry.id;
+        document.getElementById('dTitle').value = entry.title;
+        document.getElementById('dBody').value = entry.body;
+        document.querySelectorAll('.mood-btn').forEach(b => {
+            b.style.borderColor = (b.getAttribute('data-m') === entry.mood) ? 'var(--white)' : 'var(--border)';
+        });
+        selectedMood = entry.mood;
+    };
+
+    renderList();
+</script>
+</body>
+</html>
